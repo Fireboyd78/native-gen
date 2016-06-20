@@ -46,6 +46,17 @@ namespace NativeGenerator
 
         static void Main(string[] args)
         {
+            // this is temporary since I just barely went open source
+            // eventually the program will require an input file
+            var lookupDir = @"C:\Dev\Research\GTA 5\";
+            var lookupFile = $@"{lookupDir}\native_lookup.dat";
+
+            if (!File.Exists(lookupFile))
+            {
+                Console.WriteLine("Dump file not found, terminating...");
+                return;
+            }
+
             Console.WriteLine("Downloading natives.json");
 
             var nativesFile = DownloadNativesFile("http://www.dev-c.com/nativedb/natives.json");
@@ -57,7 +68,7 @@ namespace NativeGenerator
                 return;
             }
 
-            var nativeDump = NativeDumpFile.Open(@"C:\Dev\Research\GTA 5\native_lookup.dat");
+            var nativeDump = NativeDumpFile.Open(lookupFile);
 
             var parsedNatives = 0;
             var foundNatives = 0;
@@ -87,7 +98,7 @@ namespace NativeGenerator
             }
 
             Console.WriteLine($"Finished parsing {parsedNatives} natives. Found {foundNatives} / {nativeDump.Natives.Count} natives that matched the dump file.");
-            File.WriteAllText(@"C:\Dev\Research\GTA 5\native_gen.log", sb.ToString());
+            File.WriteAllText($@"{lookupDir}\native_gen.log", sb.ToString());
 
             Console.WriteLine("Creating script");
 
@@ -114,7 +125,7 @@ namespace NativeGenerator
             }
 
             scriptWriter.CloseMainBlock();
-            scriptWriter.SaveFile(@"C:\Dev\Research\GTA 5\", "native_gen");
+            scriptWriter.SaveFile(lookupDir, "native_gen");
 
             Console.WriteLine("Operation completed.");
             
