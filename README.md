@@ -1,2 +1,2 @@
-# native-gen
+# Native Generator
 Tool for generating IDA scripts to aid in reverse-engineering of GTA 5.
