@@ -21,7 +21,7 @@ See below for how your dump file should be structured.
 Not yet implemented.
 #### Binary
 Binary dumps are simple files that must be in little-endian. For most purposes, version 1 dumps should suffice.
-```
+```C++
 struct NativeDumpFile
 {
     int32 magic = 0x5654414E; // 'NATV'
