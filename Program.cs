@@ -41,12 +41,14 @@ namespace NativeGenerator
         {
             using (var wc = new WebClient())
             {
-                wc.Headers.Add("Accept-Encoding: gzip, deflate, sdch");
+                // wc.Headers.Add("Accept-Encoding: gzip, deflate, sdch");
 
                 var data = wc.DownloadData(url);
+                Console.WriteLine("Downloaded {0} bytes from {1}", data.Length, url);
                 var rawData = "{}";
 
-                using (var ms = new MemoryStream())
+                var ms = new MemoryStream();
+
                 using (var gz = new GZipStream(new MemoryStream(data), CompressionMode.Decompress))
                 {
                     var decompress = new byte[data.Length];
@@ -151,6 +153,7 @@ namespace NativeGenerator
                     Console.WriteLine(message, name);
             }
 
+            var rawData = File.ReadAllText((Options.lookupFile));
 
             // original code resumes -- sfinktah
             var lookupDir = @".";
@@ -164,9 +167,9 @@ namespace NativeGenerator
 
             Console.WriteLine("Downloading natives.json");
 
-            // var nativesFile = DownloadNativesFile("http://www.dev-c.com/nativedb/natives.json");
-            var rawData = File.ReadAllText($@"{lookupDir}\natives-b757.tidy.json");
-            var nativesFile = JsonConvert.DeserializeObject<Json.NativeFile>(rawData);
+            // var rawData = File.ReadAllText(lookupFile);
+            var nativesFile = DownloadNativesFile("https://cdn.rawgit.com/sfinktah/native-gen/master/json/natives-b791.tidy.json.gz");
+            // var nativesFile = JsonConvert.DeserializeObject<Json.NativeFile>(rawData);
             var sb = new StringBuilder();
 
             if (nativesFile == null)
