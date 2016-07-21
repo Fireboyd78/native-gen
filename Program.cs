@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Text;
 
 using Newtonsoft.Json;
+using NDesk.Options;
 
 /*
     Huge shoutout goes to JohnnyCrazy for writing most of the original code
@@ -17,18 +18,37 @@ using Newtonsoft.Json;
 */
 namespace NativeGenerator
 {
+    public static class Options
+    {
+        public static int verbosity { get; set; } = 0;
+        private static String _lookupFile = "";
+        public static String lookupFile
+        {
+            get { return _lookupFile; }
+            set { 
+                if (File.Exists(value)) {
+                    _lookupFile = value; 
+                } else {
+                    throw new Exception("lookup file does not exist");
+                }
+            }
+        }
+    }
+
     class Program
     {
         private static Json.NativeFile DownloadNativesFile(string url)
         {
             using (var wc = new WebClient())
             {
-                wc.Headers.Add("Accept-Encoding: gzip, deflate, sdch");
+                // wc.Headers.Add("Accept-Encoding: gzip, deflate, sdch");
 
                 var data = wc.DownloadData(url);
+                Console.WriteLine("Downloaded {0} bytes from {1}", data.Length, url);
                 var rawData = "{}";
 
-                using (var ms = new MemoryStream())
+                var ms = new MemoryStream();
+
                 using (var gz = new GZipStream(new MemoryStream(data), CompressionMode.Decompress))
                 {
                     var decompress = new byte[data.Length];
@@ -44,14 +64,102 @@ namespace NativeGenerator
             }
         }
 
+        static void listBuilds()
+        {
+            int[] buildList = {
+                331,
+                350,
+                372,
+                393,
+                463,
+                505,
+                573,
+                617,
+                678,
+                757,
+                791 
+            };
+            Console.Write(System.AppDomain.CurrentDomain.FriendlyName + ": ");
+            Console.WriteLine("Available builds for use with --build");
+            foreach (var build in buildList)
+            {
+                Console.WriteLine("   {0}", build);
+            }
+        }
+
         static void Main(string[] args)
         {
             // this is temporary since I just barely went open source
             // eventually the program will require an input file
-            var lookupDir = @"C:\Dev\Research\GTA 5\";
-            var lookupFile = $@"{lookupDir}\native_lookup.dat";
 
-            if (!File.Exists(lookupFile))
+            // Lets get un-temporary! -- sfinktah
+
+            /* Command Line Handling */
+            IDAScriptWriterBase scriptWriter = null;
+            scriptWriter = new IDAScriptWriter(); // Will change to IDAPythonWriter if --python option is present
+            bool show_help = false;
+            bool will_exit = false;
+            List<string> names = new List<string>();
+            int repeat = 1;
+
+            var p = new OptionSet() {
+                { "p|python", "output python script (default: idc)", v => { if (v != null) scriptWriter = new IDAPythonWriter(); } },
+                { "b|build=", "GTA5 build number, see --build-help", (String v) =>
+                {
+                    Console.WriteLine("Selected build {0}", v);
+                } },
+                { "l|lookup=", "Path to file with hash/offsets", v => Options.lookupFile = v },
+                { "build-help", "list available GTA5 builds", v => { if (v != null) listBuilds(); will_exit = true; }},
+//              { "r|repeat=", "the number of {TIMES} to repeat the greeting.\n" +
+//                      "this must be an integer.", (int v)  => repeat = v },
+                { "v", "increase debug message verbosity", v => { if (v != null) ++Options.verbosity; ; } },
+                { "h|help",  "show this message and exit", v => show_help = v != null },
+            };
+
+            List<string> extra;
+            try
+            {
+                extra = p.Parse(args);
+            }
+            catch (OptionException e)
+            {
+                Console.Write(System.AppDomain.CurrentDomain.FriendlyName + ": ");
+                Console.WriteLine(e.Message);
+                Console.WriteLine("Try `{0} --help' for more information.", System.AppDomain.CurrentDomain.FriendlyName);
+                return;
+            }
+
+            if (show_help || will_exit)
+            {
+                if (show_help) ShowHelp(p);
+                return;
+            }
+
+            string message;
+            if (extra.Count > 0)
+            {
+                message = string.Join(" ", extra.ToArray());
+                Debug("Using new message: {0}", message);
+            }
+            else
+            {
+                message = "Hello {0}!";
+                Debug("Using default message: {0}", message);
+            }
+
+            foreach (string name in names)
+            {
+                for (int i = 0; i < repeat; ++i)
+                    Console.WriteLine(message, name);
+            }
+
+            var rawData = File.ReadAllText((Options.lookupFile));
+
+            // original code resumes -- sfinktah
+            var lookupDir = @".";
+            var lookupFile = $@"{lookupDir}\nativeDumpFile.bin";
+
+            if (Options.lookupFile.Length < 1 || !File.Exists(Options.lookupFile))
             {
                 Console.WriteLine("Dump file not found, terminating...");
                 return;
@@ -59,7 +167,9 @@ namespace NativeGenerator
 
             Console.WriteLine("Downloading natives.json");
 
-            var nativesFile = DownloadNativesFile("http://www.dev-c.com/nativedb/natives.json");
+            // var rawData = File.ReadAllText(lookupFile);
+            var nativesFile = DownloadNativesFile("https://cdn.rawgit.com/sfinktah/native-gen/master/json/natives-b791.tidy.json.gz");
+            // var nativesFile = JsonConvert.DeserializeObject<Json.NativeFile>(rawData);
             var sb = new StringBuilder();
 
             if (nativesFile == null)
@@ -102,8 +212,7 @@ namespace NativeGenerator
 
             Console.WriteLine("Creating script");
 
-            IDAScriptWriterBase scriptWriter = null;
-            
+
             // TODO: make proper argument parser
             if (args.Contains("--py"))
                 scriptWriter = new IDAPythonWriter();
@@ -128,9 +237,28 @@ namespace NativeGenerator
             scriptWriter.SaveFile(lookupDir, "native_gen");
 
             Console.WriteLine("Operation completed.");
-            
+
             if (System.Diagnostics.Debugger.IsAttached)
                 Console.ReadKey();
+        }
+
+
+        static void ShowHelp(OptionSet p)
+        {
+            Console.WriteLine("Usage: {0} [OPTIONS] more-stuff-todo", System.AppDomain.CurrentDomain.FriendlyName);
+            Console.WriteLine("Generates IDA scripts for identifying GTAV Native Functions.");
+            Console.WriteLine();
+            Console.WriteLine("Options:");
+            p.WriteOptionDescriptions(Console.Out);
+        }
+
+        static void Debug(string format, params object[] args)
+        {
+            if (Options.verbosity > 0)
+            {
+                Console.Write("# ");
+                Console.WriteLine(format, args);
+            }
         }
     }
 }
